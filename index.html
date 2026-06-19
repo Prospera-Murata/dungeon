@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dungeon Treasure Hunt</title>
+    <style>
+        /* --- CSS: デザイン (高級感・ダンジョン風) --- */
+        :root {
+            --bg-color: #121212; /* 深い闇 */
+            --panel-color: #1e1e1e; /* 石の壁 */
+            --accent-gold: #d4af37; /* 古びた金 */
+            --text-color: #e0e0e0;
+            --hp-color: #ff4d4d;
+            --danger-color: #ff3333;
+            --success-color: #4caf50;
+            --font-family: 'Times New Roman', Times, serif; /* アンティーク調 */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            /* 石畳のようなうっすらとしたテクスチャ */
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(50,50,50,0.1) 0%, rgba(0,0,0,0) 80%),
+                linear-gradient(45deg, #151515 25%, transparent 25%), 
+                linear-gradient(-45deg, #151515 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #151515 75%),
+                linear-gradient(-45deg, transparent 75%, #151515 75%);
+            background-size: 100% 100%, 20px 20px;
+        }
+
+        #game-container {
+            background-color: var(--panel-color);
+            width: 100%;
+            max-width: 600px; /* PCでの最大幅 */
+            border: 3px solid var(--accent-gold);
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.3); /* 金色の輝き */
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ヘッダー: ステータス表示 */
+        header {
+            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+            padding: 15px;
+            border-bottom: 2px solid var(--accent-gold);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            color: var(--accent-gold);
+            text-shadow: 1px 1px 2px black;
+        }
+
+        .status-group {
+            display: flex;
+            gap: 15px;
+            font-weight: bold;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        #hp-display { color: var(--hp-color); }
+        #key-display { color: var(--accent-gold); }
+
+        /* メインエリア: イベント描写 */
+        main {
+            flex: 1;
+            padding: 20px;
+            text-align: center;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #visual-area {
+            font-size: 5rem; /* 絵文字を大きく */
+            margin-bottom: 20px;
+            text-shadow: 0 0 15px rgba(255,255,255,0.5);
+            transition: transform 0.3s ease;
+        }
+
+        #message-area {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            min-height: 3em;
+        }
+
+        .log-monster { color: var(--danger-color); font-weight: bold; }
+        .log-key { color: var(--accent-gold); font-weight: bold; }
+        .log-chest { color: #8ad4ff; font-weight: bold; }
+        .log-system { color: #aaa; font-style: italic; }
+
+        /* フッター: アクションボタン */
+        footer {
+            padding: 15px;
+            background-color: rgba(0,0,0,0.3);
+            border-top: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            font-size: 1rem;
+            font-family: var(--font-family);
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* 通常ボタン（移動など） */
+        .btn-normal {
+            background: linear-gradient(180deg, #444 0%, #222 100%);
+            color: white;
+            border: 1px solid #555;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+
+        .btn-normal:hover { background: linear-gradient(180deg, #555 0%, #333 100%); }
+
+        /* 戦闘用ボタン */
+        .btn-attack {
+            background: linear-gradient(180deg, #aa0000 0%, #660000 100%);
+            color: white;
+            border: 1px solid #800;
+            box-shadow: 0 0 10px rgba(255,0,0,0.3);
+        }
+        .btn-attack:hover { background: linear-gradient(180deg, #cc0000 0%, #880000 100%); }
+
+        /* お宝用ボタン */
+        .btn-treasure {
+            background: linear-gradient(180deg, #e6b800 0%, #b38f00 100%);
+            color: #222;
+            border: 1px solid var(--accent-gold);
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+        }
+        .btn-treasure:hover { background: linear-gradient(180deg, #ffcc00 0%, #d4af37 100%); }
+
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            box-shadow: none !important;
+        }
+
+        /* ユーティリティ */
+        .hidden { display: none !important; }
+
+        /* スマホ対応 (レスポンシブ) */
+        @media (max-width: 480px) {
+            body { padding: 10px; }
+            #game-container { border-width: 2px; }
+            header { padding: 10px; }
+            h1 { font-size: 1rem; }
+            main { padding: 15px; min-height: 250px; }
+            #visual-area { font-size: 4rem; }
+            #message-area { font-size: 1rem; }
+            button { padding: 10px; font-size: 0.9rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <header>
+            <h1>Dungeon Quest</h1>
+            <div class="status-group">
+                <div class="status">❤️ <span id="hp-display">100</span></div>
+                <div class="status">🔑 <span id="key-display">0</span></div>
+            </div>
+        </header>
+
+        <main>
+            <div id="visual-area">🕯️</div>
+            <div id="message-area">
+                <p class="log-system">薄暗いダンジョンの入り口に立っている。</p>
+                <p>奥から冷たい風が吹いてきた...</p>
+            </div>
+        </main>
+
+        <footer>
+            <div id="action-normal" class="button-row">
+                <button class="btn-normal" onclick="game.move('north')">北へ進む</button>
+                <button class="btn-normal" onclick="game.move('east')">東へ進む</button>
+            </div>
+            <div id="action-normal-2" class="button-row">
+                <button class="btn-normal" onclick="game.move('south')">南へ進む</button>
+                <button class="btn-normal" onclick="game.move('west')">西へ進む</button>
+            </div>
+
+            <div id="action-battle" class="button-row hidden">
+                <button class="btn-attack" onclick="game.fight()">戦う</button>
+                <button class="btn-normal" onclick="game.escape()">逃げる</button>
+            </div>
+
+            <div id="action-chest" class="button-row hidden">
+                <button id="open-chest-btn" class="btn-treasure" onclick="game.openChest()">宝箱を開ける</button>
+                <button class="btn-normal" onclick="game.leaveChest()">その場を去る</button>
+            </div>
+
+            <div id="action-end" class="button-row hidden">
+                <button class="btn-normal" onclick="location.reload()">もう一度挑戦する</button>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        /* --- JavaScript: ゲームロジック (バニラJS) --- */
+
+        const game = {
+            // --- 状態 (State) ---
+            player: {
+                hp: 100,
+                maxHp: 100,
+                hasKey: false
+            },
+            currentMonster: null,
+            isGameOver: false,
+
+            // --- DOM要素のキャッシュ ---
+            el: {
+                hp: document.getElementById('hp-display'),
+                key: document.getElementById('key-display'),
+                visual: document.getElementById('visual-area'),
+                message: document.getElementById('message-area'),
+                btnOpenChest: document.getElementById('open-chest-btn'),
+                // 各ボタンエリア
+                actions: {
+                    normal: [document.getElementById('action-normal'), document.getElementById('action-normal-2')],
+                    battle: document.getElementById('action-battle'),
+                    chest: document.getElementById('action-chest'),
+                    end: document.getElementById('action-end')
+                }
+            },
+
+            // --- データ定義 ---
+            monsters: [
+                { name: "スライム", emoji: "💧", hp: 20, atk: 5 },
+                { name: "ゴブリン", emoji: "👺", hp: 40, atk: 10 },
+                { name: "スケルトン", emoji: "💀", hp: 30, atk: 15 }
+            ],
+
+            // --- コア関数 ---
+
+            // 1. 移動 (イベント抽選)
+            move: function(direction) {
+                if (this.isGameOver) return;
+                
+                this.shakeVisual();
+                const dirName = { north: "北", east: "東", south: "南", west: "西" }[direction];
+                
+                // 1.5秒だけ「移動中」にする（演出）
+                this.setMessage(`<p class="log-system">${dirName}の通路を進んでいます...</p>`);
+                this.setVisual("🚶");
+                this.toggleActionButtons('none');
+
+                setTimeout(() => {
+                    if (this.isGameOver) return; // 移動中に死んでたら何もしない
+                    const rand = Math.random();
+
+                    if (rand < 0.4) {
+                        this.startBattle(); // 40% モンスター
+                    } else if (rand < 0.6) {
+                        this.findKey();    // 20% 鍵
+                    } else if (rand < 0.8) {
+                        this.findChest();  // 20% 宝箱
+                    } else {
+                        this.nothingHappens(); // 20% 何もなし
+                    }
+                }, 800);
+            },
+
+            // 2. モンスター戦闘 (RPG風)
+            startBattle: function() {
+                // ランダムにモンスターを選抜
+                this.currentMonster = { ...this.monsters[Math.floor(Math.random() * this.monsters.length)] };
+                
+                this.setVisual(this.currentMonster.emoji);
+                this.setMessage(
+                    `<p class="log-monster">モンスターが現れた！</p>` +
+                    `<p>${this.currentMonster.name} (HP: ${this.currentMonster.hp}) が襲いかかってきた！</p>`
+                );
+                this.toggleActionButtons('battle');
+            },
+
+            fight: function() {
+                if (!this.currentMonster || this.isGameOver) return;
+
+                let log = "";
+                // プレイヤーの攻撃 (10〜20ダメージ)
+                const playerAtk = 10 + Math.floor(Math.random() * 11);
+                this.currentMonster.hp -= playerAtk;
+                log += `<p>あなたの攻撃！ ${this.currentMonster.name}に <span class="log-monster">${playerAtk}</span> のダメージ！</p>`;
+
+                if (this.currentMonster.hp <= 0) {
+                    // モンスター討伐
+                    log += `<p class="log-success">${this.currentMonster.name}を倒した！</p>`;
+                    this.setMessage(log);
+                    this.setVisual("✨");
+                    this.currentMonster = null;
+                    this.toggleActionButtons('normal');
+                    return;
+                }
+
+                // モンスターの攻撃
+                const monsterAtk = Math.floor(Math.random() * (this.currentMonster.atk + 1));
+                this.player.hp -= monsterAtk;
+                log += `<p>${this.currentMonster.name}の攻撃！ あなたは <span class="log-danger">${monsterAtk}</span> のダメージを受けた！</p>`;
+                
+                this.setMessage(
+                    `<p>${this.currentMonster.name} (HP: ${this.currentMonster.hp})</p>` +
+                    `<hr style="border:1px solid #333; margin:10px 0;">` +
+                    log
+                );
+                this.updateUI();
+
+                if (this.player.hp <= 0) {
+                    this.gameOver();
+                } else {
+                    this.shakeVisual(); // 自分がダメージを受けたとき揺らす
+                }
+            },
+
+            escape: function() {
+                this.setMessage(`<p>あなたは必死に逃げ出した！</p><p class="log-system">元の場所に戻った。</p>`);
+                this.setVisual("🏃💨");
+                this.currentMonster = null;
+                this.toggleActionButtons('normal');
+            },
+
+            // 3. 鍵の入手
+            findKey: function() {
+                if (this.player.hasKey) {
+                    // 既に持ってたら「何もなし」にする
+                    this.nothingHappens();
+                    return;
+                }
+                this.player.hasKey = true;
+                this.setVisual("🗝️");
+                this.setMessage(
+                    `<p class="log-key">床に何かが落ちている...</p>` +
+                    `<p>古びた<span class="log-key">【鍵】</span>を手に入れた！</p>`
+                );
+                this.updateUI();
+                this.toggleActionButtons('normal');
+            },
+
+            // 4. 宝箱の発見と判定
+            findChest: function() {
+                this.setVisual("🧰");
+                this.setMessage(
+                    `<p class="log-chest">奥に豪華な宝箱がある！</p>` +
+                    `<p>どうやら鍵がかかっているようだ。</p>`
+                );
+                
+                // 鍵を持ってるかどうかでボタンの活性化を変える
+                if (this.player.hasKey) {
+                    this.el.btnOpenChest.disabled = false;
+                    this.el.btnOpenChest.innerText = "鍵を使って開ける";
+                } else {
+                    this.el.btnOpenChest.disabled = true;
+                    this.el.btnOpenChest.innerText = "鍵が必要だ";
+                }
+                
+                this.toggleActionButtons('chest');
+            },
+
+            openChest: function() {
+                if (!this.player.hasKey) return;
+                this.gameClear();
+            },
+
+            leaveChest: function() {
+                this.setMessage(`<p>宝箱をあきらめて、探索を続けることにした。</p>`);
+                this.setVisual("🕯️");
+                this.toggleActionButtons('normal');
+            },
+
+            // 5. イベントなし
+            nothingHappens: function() {
+                const msgs = [
+                    "行き止まりだ。静寂が包んでいる。",
+                    "ただの湿った壁が続いている。",
+                    "不気味な音が聞こえたが、誰もいない。"
+                ];
+                this.setMessage(`<p>${msgs[Math.floor(Math.random() * msgs.length)]}</p>`);
+                this.setVisual("💀");
+                this.toggleActionButtons('normal');
+            },
+
+            // 6. ゲーム終了系
+            gameOver: function() {
+                this.isGameOver = true;
+                this.player.hp = 0;
+                this.updateUI();
+                this.setVisual("👻");
+                this.setMessage(
+                    `<h2 class="log-danger" style="font-size:2rem; margin-bottom:10px;">GAME OVER</h2>` +
+                    `<p>あなたはダンジョンの露と消えた...</p>`
+                );
+                this.toggleActionButtons('end');
+            },
+
+            gameClear: function() {
+                this.isGameOver = true;
+                this.setVisual("💰👑💰");
+                this.setMessage(
+                    `<h2 class="log-success" style="font-size:2rem; margin-bottom:10px;">GAME CLEAR!</h2>` +
+                    `<p>宝箱の中には伝説の王冠が入っていた！</p>` +
+                    `<p>あなたは無事にダンジョンを脱出した！</p>`
+                );
+                this.toggleActionButtons('end');
+                
+                // 勝利のUI更新（HPを隠すなど）
+                this.el.hp.parentElement.classList.add('hidden');
+                this.el.key.parentElement.classList.add('hidden');
+            },
+
+
+            // --- ユーティリティ関数 ---
+
+            // UIのステータス表示を更新
+            updateUI: function() {
+                this.el.hp.innerText = this.player.hp;
+                this.el.key.innerText = this.player.hasKey ? "1" : "0";
+                
+                if (this.player.hp < 30) {
+                    this.el.hp.style.animation = "blink 0.5s infinite alternate";
+                } else {
+                    this.el.hp.style.animation = "none";
+                }
+            },
+
+            // メッセージエリア更新
+            setMessage: function(html) {
+                this.el.message.innerHTML = html;
+            },
+
+            // ビジュアルエリア（絵文字）更新
+            setVisual: function(emoji) {
+                this.el.visual.innerText = emoji;
+            },
+
+            // ダメージ時などにビジュアルを揺らす演出
+            shakeVisual: function() {
+                this.el.visual.style.transform = "scale(1.2) rotate(10deg)";
+                setTimeout(() => {
+                    this.el.visual.style.transform = "scale(1) rotate(0deg)";
+                }, 200);
+            },
+
+            // 状況に合わせてボタンの表示・非表示を切り替える
+            toggleActionButtons: function(mode) {
+                // 一旦全部隠す
+                this.el.actions.normal.forEach(el => el.classList.add('hidden'));
+                this.el.actions.battle.classList.add('hidden');
+                this.el.actions.chest.classList.add('hidden');
+                this.el.actions.end.classList.add('hidden');
+
+                // 指定されたモードだけ出す
+                if (mode === 'normal') {
+                    this.el.actions.normal.forEach(el => el.classList.remove('hidden'));
+                } else if (mode === 'battle') {
+                    this.el.actions.battle.classList.remove('hidden');
+                } else if (mode === 'chest') {
+                    this.el.actions.chest.classList.remove('hidden');
+                } else if (mode === 'end') {
+                    this.el.actions.end.classList.remove('hidden');
+                }
+            }
+        };
+
+        // 瀕死時の点滅アニメーション用CSSを追加
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes blink {
+                0% { opacity: 1; }
+                100% { opacity: 0.3; }
+            }
+        `;
+        document.head.appendChild(style);
+
+
+        // 初期化
+        game.updateUI();
+
+    </script>
+</body>
+</html>
